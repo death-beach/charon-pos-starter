@@ -25,3 +25,42 @@ sequenceDiagram
   Wallet->>Server: On-chain tx (USDC to merchant address)
   Server->>Server: Confirm tx (RPC/WS)
   Server->>POS: PUT /orders/:id status=PAID
+
+
+### Refunds (v1 policy)
+On-chain refunds return to the original payer address.
+Merchant maintains a small “refund buffer” in their wallet; refunds blocked if below threshold.
+Future option: short escrow window or fiat refund rails.
+
+### Quick start
+Requirements: Node 18+, a Solana RPC endpoint, a USDC mint address.
+Copy .env.example to .env and set values.
+Install: npm i in /server and /web
+Run server: npm run dev (port 3001)
+Run web: npm run dev (port 5173)
+Open http://localhost:5173 and click “Create test order”
+
+### Config
+SOLANA_RPC=
+MERCHANT_WALLET_ADDRESS=
+USDC_MINT=
+POS_WEBHOOK_SECRET= (if you secure POS callbacks)
+
+###Notes
+This is a demo. Secure your webhooks, validate inputs, and handle idempotency in production.
+Privy/Jupiter integrations are referenced but not required here—see links below.
+
+### Links
+Solana Pay: https://docs.solanapay.com
+USDC on Solana: https://docs.circle.com
+Privy: https://www.privy.io/docs
+Solana Attestation Service: https://github.com/anza-xyz/solana-attestation-service
+
+### License
+MIT 
+
+.env.example:
+SOLANA_RPC=
+MERCHANT_WALLET_ADDRESS=
+USDC_MINT=
+POS_WEBHOOK_SECRET=
