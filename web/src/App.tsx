@@ -28,7 +28,7 @@ export default function App() {
           if (timer.current) window.clearInterval(timer.current);
         }
       } catch {}
-    }, 60000);
+    }, 5000);
     return () => {
       if (timer.current) window.clearInterval(timer.current);
     };

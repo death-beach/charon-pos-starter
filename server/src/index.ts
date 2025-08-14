@@ -14,22 +14,22 @@ app.use(cors({ origin: ENV.CORS_ORIGIN }));
 app.post("/payments", async (req: Request, res: Response) => {
   console.log("POST /payments called with body:", req.body);
   try {
-    const body = req.body as CreatePaymentBody;
-    if (!body?.orderId || typeof body.amount !== "number") {
+    const body = req.body as CreatePaymentBody & { merchantPubkey: string, usdcMint: string };
+    if (!body?.orderId || typeof body.amount !== "number" || !body.merchantPubkey || !body.usdcMint) {
       console.log("Invalid request body:", body);
-      return res.status(400).json({ error: "orderId and amount required" });
+      return res.status(400).json({ error: "orderId, amount, merchantPubkey, and usdcMint required" });
     }
     console.log(`Creating order ${body.orderId} for amount ${body.amount}`);
     const order = createOrder(body);
     const { PublicKey } = await import("@solana/web3.js");
     const solanaPayUrl = buildSolanaPayUrl(
-      merchantPubkey,
+      new PublicKey(body.merchantPubkey),
       order.amount,
       new PublicKey(order.reference),
       "Charon POS",
       `Order ${order.orderId}`,
       `order:${order.orderId}`,
-      usdcMint
+      new PublicKey(body.usdcMint)
     );
     const qrDataUrl = await toDataUrl(solanaPayUrl);
     res.json({ orderId: order.orderId, solanaPayUrl, qrDataUrl });
@@ -55,6 +55,38 @@ app.get("/payments/:orderId/status", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("GET /payments/:orderId/status (soft):", err);
     res.json({ status: order.status, rateLimited: true, backoffMs: order.backoffMs ?? 0 });
+  }
+});
+
+// Webhook for USDC transfers
+app.post("/webhook", async (req: Request, res: Response) => {
+  console.log("POST /webhook called with body:", JSON.stringify(req.body, null, 2));
+  try {
+    const events = req.body;
+    if (!Array.isArray(events) || !events.length) {
+      console.log("Invalid webhook payload: no events");
+      return res.status(400).json({ error: "Invalid webhook payload" });
+    }
+    for (const event of events) {
+      if (event.type !== "transfer" || !event.tokenTransfers) {
+        console.log("Skipping non-transfer event:", event.type);
+        continue;
+      }
+      for (const transfer of event.tokenTransfers) {
+        if (
+          transfer.mint === usdcMint.toBase58() &&
+          transfer.to === merchantPubkey.toBase58()
+        ) {
+          const amount = Number(transfer.amount) / 1_000_000; // USDC has 6 decimals
+          console.log(`Detected USDC transfer of ${amount} to ${merchantPubkey.toBase58()}`);
+          await checkAndUpdateStatus({ amount, merchantPubkey: merchantPubkey.toBase58(), usdcMint: usdcMint.toBase58() });
+        }
+      }
+    }
+    res.status(200).json({ status: "ok" });
+  } catch (err) {
+    console.error("Error in POST /webhook:", err);
+    res.status(500).json({ error: String(err) });
   }
 });
 
