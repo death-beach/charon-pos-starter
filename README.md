@@ -14,6 +14,34 @@ Accept USDC via Solana Pay from a POS order and mark it PAID on confirmation. Mi
 3. Customer scans with a wallet (e.g., Phantom) and pays in USDC
 4. Server listens for confirmation and updates the order to PAID
 
+# Charon POS Starter
+
+Minimal Solana Pay demo (Node + TS backend, Vite React frontend). No DB/Helius: creates payment URLs, renders QR, and confirms on-chain via RPC polling.
+
+## Quick start
+1. Copy `.env.example` to `server/.env` **(place it in /server)** and fill in:
+   - `SOLANA_RPC`
+   - `MERCHANT_WALLET_ADDRESS`
+   - `USDC_MINT`
+2. Install & run server:
+   ```bash
+   cd server && npm i && npm run dev
+3. In a new terminal, run web:
+   - cd web && npm i && npm run dev
+4. Open the web UI (default Vite port) and create a test order. Scan QR with a Solana wallet and pay. Status will flip to PAID when confirmed.
+
+ For demo safety, amounts are in the SPL token defined by USDC_MINT. For devnet, use a devnet USDC mint (e.g., Es9vMFrzaCER... on mainnet is USDT—set the proper mint for your cluster).
+
+## Endpoints:
+POST /payments → { orderId, amount } → returns { solanaPayUrl, qrDataUrl, orderId }
+GET /payments/:orderId/status → { status: "PENDING" | "PAID" }
+POST /refunds → returns 501 Not Implemented (stub)
+
+## Notes:
+- In-memory Map holds pending orders for demo.
+- Background loop polls recent signatures for merchant address; matches memo/reference+amount.
+- No persistence; restart clears state.
+
 ```mermaid
 sequenceDiagram
   participant POS
