@@ -1,94 +1,109 @@
-# Charon POS Starter (Solana Pay + POS flow)
+# Charon POS Starter (Solana Pay + POS Flow)
 
-Accept USDC via Solana Pay from a POS order and mark it PAID on confirmation. Minimal, framework-agnostic starter to show the flow we use with Clover.
+Accept USDC via Solana Pay from a POS order and mark it PAID on confirmation. Minimal, framework-agnostic starter to show the flow used with Clover.
 
 ## Highlights
-- Generate Solana Pay URLs + QR codes for a given orderId/amount
-- Confirm on-chain settlement and update order status
+
+- Generate Solana Pay URLs and QR codes for orders
+- Confirm USDC payments instantly via QuickNode webhook
 - 60–90s demo video: <Loom link>
-- Works with any POS that exposes createOrder/updateOrder APIs (Clover shown in demo)
+- Compatible with any POS supporting createOrder/updateOrder APIs (Clover shown in demo)
 
-## How it works
-1. POS creates an order and POSTs to /payments to request crypto checkout
-2. Server returns a Solana Pay URL; client renders QR
-3. Customer scans with a wallet (e.g., Phantom) and pays in USDC
-4. Server listens for confirmation and updates the order to PAID
+## How It Works
 
-# Charon POS Starter
+1. POS creates an order and sends it to `/payments`
+2. Server returns a Solana Pay URL and QR code
+3. Customer scans QR with a wallet (e.g., Jupiter) and pays USDC
+4. QuickNode webhook notifies server, updating order to PAID
 
-Minimal Solana Pay demo (Node + TS backend, Vite React frontend). No DB/Helius: creates payment URLs, renders QR, and confirms on-chain via RPC polling.
-
-## Quick start
-1. Copy `.env.example` to `server/.env` **(place it in /server)** and fill in:
-   - `SOLANA_RPC`
-   - `MERCHANT_WALLET_ADDRESS`
-   - `USDC_MINT`
-2. Install & run server:
-   ```bash
-   cd server && npm i && npm run dev
-3. In a new terminal, run web:
-   - cd web && npm i && npm run dev
-4. Open the web UI (default Vite port) and create a test order. Scan QR with a Solana wallet and pay. Status will flip to PAID when confirmed.
-
- For demo safety, amounts are in the SPL token defined by USDC_MINT. For devnet, use a devnet USDC mint (e.g., Es9vMFrzaCER... on mainnet is USDT—set the proper mint for your cluster).
-
-## Endpoints:
-POST /payments → { orderId, amount } → returns { solanaPayUrl, qrDataUrl, orderId }
-GET /payments/:orderId/status → { status: "PENDING" | "PAID" }
-POST /refunds → returns 501 Not Implemented (stub)
-
-## Notes:
-- In-memory Map holds pending orders for demo.
-- Background loop polls recent signatures for merchant address; matches memo/reference+amount.
-- No persistence; restart clears state.
-
-
+```mermaid
 sequenceDiagram
-  participant POS
+  participant POS as POS UI
   participant Server
   participant Wallet
-  POS->>Server: POST /payments {orderId, amount}
-  Server-->>POS: solanaPayUrl (for QR)
-  POS->>Wallet: Show QR
-  Wallet->>Server: On-chain tx (USDC to merchant address)
-  Server->>Server: Confirm tx (RPC/WS)
-  Server->>POS: PUT /orders/:id status=PAID
+  participant QuickNode
+  POS->>Server: POST /payments {orderId, amount, merchantPubkey, usdcMint}
+  Server-->>POS: {orderId, solanaPayUrl, qrDataUrl}
+  POS->>Wallet: Display QR (solanaPayUrl)
+  Wallet->>QuickNode: On-chain USDC transfer to merchantPubkey
+  QuickNode->>Server: POST /webhook {transactions}
+  Server->>Server: Match amount to order, update status
+  POS->>Server: GET /payments/:orderId/status
+  Server-->>POS: {status: "PAID"}
+```
 
+# Quick Start
 
-### Refunds (v1 policy)
-On-chain refunds return to the original payer address.
-Merchant maintains a small “refund buffer” in their wallet; refunds blocked if below threshold.
-Future option: short escrow window or fiat refund rails.
+1. Copy server/.env.example to server/.env and set:
+   - QUICKNODE_RPC_URL: QuickNode Solana mainnet RPC URL
+   - QUICKNODE_API_KEY: QuickNode API key
+   - QUICKNODE_WEBHOOK_ID: Webhook ID from QuickNode dashboard
+   - MERCHANT_WALLET_ADDRESS: Merchant wallet (e.g., 5s8eKrWLo2Z3hJKaBjDxCTEHNDuskEk3rNvRMNmoK5bD)
+   - USDC_MINT: USDC mint (e.g., EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
 
-### Quick start
-Requirements: Node 18+, a Solana RPC endpoint, a USDC mint address.
-Copy .env.example to .env and set values.
-Install: npm i in /server and /web
-Run server: npm run dev (port 3000)
-Run web: npm run dev (port 5173)
-Open http://localhost:5173 and click “Create test order”
+2. Set up QuickNode webhook:
+   - In QuickNode dashboard, create a solanaWalletFilter webhook for MERCHANT_WALLET_ADDRESS
+   - Set destination to https://<your-pinggy-url>.pinggy.link/webhook (run: ssh -p 443 -R0:localhost:3000 tcp.pinggy.io)
 
-### Config
-SOLANA_RPC=
+3. Install and run server:
+      `cd server && npm i && npm run dev`
+
+4. Install and run web:
+      `cd web && npm i && npm run dev`
+
+5. Open http://localhost:5173, create a test order, scan QR with a Solana wallet, and pay USDC. Status flips to PAID on confirmation.
+
+*For demo safety, amounts are in USDC (mainnet). For devnet, use a devnet USDC mint and set SOLANA_CLUSTER=devnet.*
+
+# Endpoints
+   - POST /payments → { orderId, amount, merchantPubkey, usdcMint } → { orderId, solanaPayUrl, qrDataUrl }
+   - GET /payments/:orderId/status → { status: "PENDING" | "PAID" }
+   - POST /webhook → QuickNode transaction payload → updates order status
+   - POST /refunds → 501 Not Implemented (stub)
+
+# Notes
+   - In-memory Map stores pending orders for demo simplicity
+   - Webhook matches USDC transfers by amount (±0.01), assuming unique amounts
+   - No persistence; restart clears state
+   - Secure webhooks with QUICKNODE_SECURITY_TOKEN in production
+
+# Refunds (v1 Policy)
+   - On-chain refunds return to the original payer address. Merchant maintains a refund buffer; refunds blocked if below threshold.
+   - Use Privy for merchant wallets and policies to handle the automated refunds.
+
+# Requirements
+Node 18+
+QuickNode account (RPC and webhook)
+Pinggy for local webhook testing
+
+# Config
+QUICKNODE_WEBHOOK_ID=
+QUICKNODE_RPC_URL=
+QUICKNODE_SECURITY_TOKEN=
+QUICKNODE_API_KEY=
 MERCHANT_WALLET_ADDRESS=
 USDC_MINT=
-POS_WEBHOOK_SECRET= (if you secure POS callbacks)
+PORT=3000
+CORS_ORIGIN=http://localhost:5173
+SOLANA_CLUSTER=mainnet-beta
 
-###Notes
-This is a demo. Secure your webhooks, validate inputs, and handle idempotency in production.
-Privy/Jupiter integrations are referenced but not required here—see links below.
-
-### Links
+# Links
 Solana Pay: https://docs.solanapay.com
 USDC on Solana: https://docs.circle.com
-Privy: https://www.privy.io/docs
-Solana Attestation Service: https://github.com/anza-xyz/solana-attestation-service
+QuickNode: https://docs.quicknode.com
+Pinggy: https://pinggy.io
 
-### License
-MIT 
+## License
+MIT
 
-.env.example:
-SOLANA_RPC=
+
+### .env.example
+QUICKNODE_WEBHOOK_ID=
+QUICKNODE_RPC_URL=
+QUICKNODE_SECURITY_TOKEN=
+QUICKNODE_API_KEY=
 MERCHANT_WALLET_ADDRESS=
 USDC_MINT=
-POS_WEBHOOK_SECRET=
+PORT=3000
+CORS_ORIGIN=http://localhost:5173
+SOLANA_CLUSTER=mainnet-beta
