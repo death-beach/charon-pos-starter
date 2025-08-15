@@ -42,7 +42,7 @@ POST /refunds → returns 501 Not Implemented (stub)
 - Background loop polls recent signatures for merchant address; matches memo/reference+amount.
 - No persistence; restart clears state.
 
-```mermaid
+
 sequenceDiagram
   participant POS
   participant Server
