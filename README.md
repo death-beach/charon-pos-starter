@@ -64,7 +64,7 @@ Future option: short escrow window or fiat refund rails.
 Requirements: Node 18+, a Solana RPC endpoint, a USDC mint address.
 Copy .env.example to .env and set values.
 Install: npm i in /server and /web
-Run server: npm run dev (port 3001)
+Run server: npm run dev (port 3000)
 Run web: npm run dev (port 5173)
 Open http://localhost:5173 and click “Create test order”
 

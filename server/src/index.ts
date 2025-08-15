@@ -4,7 +4,7 @@ import { ENV } from "./env";
 import { buildSolanaPayUrl, createOrder, getOrder, checkAndUpdateStatus } from "./payments";
 import { merchantPubkey, usdcMint } from "./solana";
 import { toDataUrl } from "./qr";
-import type { CreatePaymentBody } from "./types";
+import type { CreatePaymentBody, QuickNodeWebhookPayload } from "./types";
 
 const app = express();
 app.use(express.json());
@@ -35,7 +35,7 @@ app.post("/payments", async (req: Request, res: Response) => {
     res.json({ orderId: order.orderId, solanaPayUrl, qrDataUrl });
   } catch (err) {
     console.error("Error in POST /payments:", err);
-    res.json({ error: String(err) }); // never kill client flow
+    res.json({ error: String(err) });
   }
 });
 
@@ -47,39 +47,53 @@ app.get("/payments/:orderId/status", async (req: Request, res: Response) => {
     console.log(`Order ${req.params.orderId} not found`);
     return res.json({ status: "PENDING", notFound: true });
   }
-  try {
-    console.log(`Checking status for order ${req.params.orderId}, current status: ${order.status}`);
-    const status = await checkAndUpdateStatus(order); // guaranteed no-throw
-    console.log(`Status check complete for ${req.params.orderId}: ${status}`);
-    res.json({ status, backoffMs: order.backoffMs ?? 0 });
-  } catch (err) {
-    console.error("GET /payments/:orderId/status (soft):", err);
-    res.json({ status: order.status, rateLimited: true, backoffMs: order.backoffMs ?? 0 });
-  }
+  console.log(`Status check complete for ${req.params.orderId}: ${order.status}`);
+  res.json({ status: order.status });
 });
 
 // Webhook for USDC transfers
 app.post("/webhook", async (req: Request, res: Response) => {
   console.log("POST /webhook called with body:", JSON.stringify(req.body, null, 2));
   try {
-    const events = req.body;
+    const events = req.body as QuickNodeWebhookPayload[];
     if (!Array.isArray(events) || !events.length) {
       console.log("Invalid webhook payload: no events");
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
     for (const event of events) {
-      if (event.type !== "transfer" || !event.tokenTransfers) {
-        console.log("Skipping non-transfer event:", event.type);
+      if (!event.transactions || !event.transactions.length) {
+        console.log("Skipping event with no transactions");
         continue;
       }
-      for (const transfer of event.tokenTransfers) {
-        if (
-          transfer.mint === usdcMint.toBase58() &&
-          transfer.to === merchantPubkey.toBase58()
-        ) {
-          const amount = Number(transfer.amount) / 1_000_000; // USDC has 6 decimals
-          console.log(`Detected USDC transfer of ${amount} to ${merchantPubkey.toBase58()}`);
-          await checkAndUpdateStatus({ amount, merchantPubkey: merchantPubkey.toBase58(), usdcMint: usdcMint.toBase58() });
+      for (const tx of event.transactions) {
+        const tokenTransfers = tx.raw?.meta?.postTokenBalances?.map((post, i) => {
+          const pre = tx.raw?.meta?.preTokenBalances?.[i];
+          if (
+            post?.mint === usdcMint.toBase58() &&
+            post?.owner === merchantPubkey.toBase58() &&
+            pre?.mint === post.mint &&
+            pre?.owner === post.owner
+          ) {
+            const amount = Number(post.uiTokenAmount.uiAmount) - Number(pre.uiTokenAmount.uiAmount);
+            return { mint: post.mint, to: post.owner, amount: amount.toString() };
+          }
+          return null;
+        }).filter((t): t is { mint: string, to: string, amount: string } => t !== null) || [];
+        for (const transfer of tokenTransfers) {
+          if (
+            transfer.mint === usdcMint.toBase58() &&
+            transfer.to === merchantPubkey.toBase58() &&
+            Number(transfer.amount) > 0
+          ) {
+            const amount = Number(transfer.amount); // Already in UI units (USDC)
+            console.log(`Detected USDC transfer of ${amount} to ${merchantPubkey.toBase58()}${event.block.blockTime ? ` at ${new Date(event.block.blockTime * 1000).toISOString()}` : ""}`);
+            await checkAndUpdateStatus({
+              amount,
+              merchantPubkey: merchantPubkey.toBase58(),
+              usdcMint: usdcMint.toBase58(),
+              signature: tx.raw.transaction.signatures[0],
+            });
+          }
         }
       }
     }

@@ -9,8 +9,9 @@ function req(name: string): string {
 }
 
 export const ENV = {
-  PORT: parseInt(process.env.PORT || "3001", 10),
-  SOLANA_RPC: req("SOLANA_RPC"),
+  PORT: parseInt(process.env.PORT || "3000", 10),
+  SOLANA_RPC: req("QUICKNODE_RPC_URL"), // Use QuickNode RPC URL
+  QUICKNODE_WEBHOOK_ID: req("QUICKNODE_WEBHOOK_ID"), // Add webhook ID
   MERCHANT_WALLET_ADDRESS: req("MERCHANT_WALLET_ADDRESS"),
   USDC_MINT: req("USDC_MINT"),
   CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:5173",

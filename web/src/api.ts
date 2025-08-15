@@ -1,4 +1,4 @@
-const BASE = "http://localhost:3001";
+const BASE = "http://localhost:3000";
 import { PublicKey } from "@solana/web3.js";
 
 const merchantPubkey = new PublicKey("5s8eKrWLo2Z3hJKaBjDxCTEHNDuskEk3rNvRMNmoK5bD");
