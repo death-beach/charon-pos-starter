@@ -41,17 +41,22 @@ sequenceDiagram
    - MERCHANT_WALLET_ADDRESS: Merchant wallet (e.g., 5s8eKrWLo2Z3hJKaBjDxCTEHNDuskEk3rNvRMNmoK5bD)
    - USDC_MINT: USDC mint (e.g., EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)
 
-2. Set up QuickNode webhook:
+2. Copy web/.env.example to web/.env.local and set:
+   - VITE_MERCHANT_WALLET_ADDRESS: Same as server MERCHANT_WALLET_ADDRESS
+   - VITE_USDC_MINT: Same as server USDC_MINT
+   - VITE_SERVER_PORT: Server port (default 3000)
+
+3. Set up QuickNode webhook:
    - In QuickNode dashboard, create a solanaWalletFilter webhook for MERCHANT_WALLET_ADDRESS
    - Set destination to https://<your-pinggy-url>.pinggy.link/webhook (run: ssh -p 443 -R0:localhost:3000 tcp.pinggy.io)
 
-3. Install and run server:
+4. Install and run server:
       `cd server && npm i && npm run dev`
 
-4. Install and run web:
+5. Install and run web:
       `cd web && npm i && npm run dev`
 
-5. Open http://localhost:5173, create a test order, scan QR with a Solana wallet, and pay USDC. Status flips to PAID on confirmation.
+6. Open http://localhost:5173, create a test order, scan QR with a Solana wallet, and pay USDC. Status flips to PAID on confirmation.
 
 *For demo safety, amounts are in USDC (mainnet). For devnet, use a devnet USDC mint and set SOLANA_CLUSTER=devnet.*
 

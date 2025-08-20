@@ -1,11 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
-import dotenv from "dotenv";
 
-dotenv.config({ path: "server/.env" });
-
-const BASE = process.env.PORT ? `http://localhost:${process.env.PORT}` : "http://localhost:3000";
-const merchantPubkey = new PublicKey(process.env.MERCHANT_WALLET_ADDRESS || "");
-const usdcMint = new PublicKey(process.env.USDC_MINT || "");
+const BASE = `http://localhost:${import.meta.env.VITE_SERVER_PORT || 3000}`;
+const merchantPubkey = new PublicKey(import.meta.env.VITE_MERCHANT_WALLET_ADDRESS || "5s8eKrWLo2Z3hJKaBjDxCTEHNDuskEk3rNvRMNmoK5bD");
+const usdcMint = new PublicKey(import.meta.env.VITE_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 export async function createPayment(orderId: string, amount: number) {
   const r = await fetch(`${BASE}/payments`, {

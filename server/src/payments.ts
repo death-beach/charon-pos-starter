@@ -1,5 +1,5 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { connection, merchantPubkey, usdcMint } from "./solana";
+import { merchantPubkey, usdcMint } from "./solana";
 import type { CreatePaymentBody, OrderRecord, PaymentStatus } from "./types";
 
 // In-memory demo store
