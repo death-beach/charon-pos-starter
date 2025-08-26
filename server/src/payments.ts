@@ -37,8 +37,8 @@ export function createOrder({ orderId, amount, merchantPubkey: merchantPubkeyStr
     backoffMs: 1000,
     isChecking: false,
     lastSeenSig: undefined,
-    merchantPubkey: merchantPubkeyStr || merchantPubkey.toBase58(),
-    usdcMint: usdcMintStr || usdcMint.toBase58(),
+    merchantPubkey: merchantPubkey.toBase58(),
+    usdcMint: usdcMint.toBase58(),
   };
   ORDERS.set(orderId, rec);
   return rec;
@@ -63,6 +63,7 @@ export async function checkAndUpdateStatus({ amount, merchantPubkey: merchantPub
       if (!matchingOrder || order.createdAt > matchingOrder.createdAt) {
         matchingOrder = order;
       }
+      console.log("Stored order:", order);
     }
   }
 
